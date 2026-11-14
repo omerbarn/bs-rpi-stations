@@ -1,0 +1,14 @@
+[Unit]
+Description=Balloon Story activation station
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/pi/station/station.py /home/pi/station/config.json
+WorkingDirectory=/home/pi/station
+User=pi
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

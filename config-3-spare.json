@@ -1,0 +1,15 @@
+{
+  "trigger": "button",
+  "button_gpio": 17,
+  "trigger_gpio": 23,
+  "echo_gpio": 24,
+  "distance_mm": 1000,
+  "cooldown_s": 5,
+  "play_sound": false,
+  "mp3_file": "/home/pi/station/sound.mp3",
+  "audio_device": "plughw:CARD=Headphones,DEV=0",
+  "send_udp": true,
+  "udp_ip": "192.168.1.100",
+  "udp_port": 7000,
+  "udp_message": "SPARE_BUTTON_GO"
+}
