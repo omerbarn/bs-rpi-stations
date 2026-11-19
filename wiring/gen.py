@@ -55,17 +55,17 @@ def power_row():
 
 # Set 1: lion (Jaycar XC4442 ultrasonic + XC4486 level converter)
 b=power_row()
-b+=box(888,110,270,84,"Logic level converter",["Jaycar XC4486 (A$4.95)","turns the sensor's 5 V Echo","into 3.3 V for the Pi"],"BUY","BUY")
+b+=box(888,110,270,84,"Logic level converter",["Jaycar XC4486 (A$4.95)","Echo in on RXI (5 V),","out on RXO (3.3 V) to the Pi"],"GOT","HAVE")
 b+=wire([(768,130),(888,130)],C["dc5"],"5 V · 3.3 V · GND",828,122)
 b+=wire([(768,175),(888,175)],C["sig"],"GPIO 24 (Echo)",828,192)
-b+=box(888,262,270,72,"Ultrasonic sensor",["Jaycar XC4442 · in the lion base,","aimed at visitors · fires under 1 m"],"GOT","HAVE")
+b+=box(888,262,270,72,"Ultrasonic sensor",["Jaycar XC4442 · in the lion base,","aimed at visitors · fires under 1.5 m"],"GOT","HAVE")
 b+=wire([(1023,194),(1023,262)],C["sig"])+'<text x="1031" y="234" font-size="11" font-weight="600" fill="#2563eb">Echo (5 V)</text>'
 b+=wire([(768,215),(840,215),(840,300),(888,300)],C["sig"])+'<text x="848" y="230" font-size="11" font-weight="600" fill="#2563eb">5 V · GND ·</text><text x="848" y="244" font-size="11" font-weight="600" fill="#2563eb">Trig GPIO 23</text>'
 b+=box(528,290,240,64,"Speaker",["on site (manager has it), next to","the lion · plays lion_roar.mp3"],None,"SITE")
 b+=wire([(648,230),(648,290)],C["audio"],"3.5 mm aux cable (on site)",585,266)
 b+=box(258,290,210,64,"Wall socket",["speaker power","(or USB if it's a USB speaker)"],None,"SITE")
 b+=wire([(468,322),(528,322)],C["ac"],"240 V",498,314)
-pins=[("Sensor VCC","Pi 5 V (pin 2)"),("Sensor GND","Pi GND (pin 6)"),("Sensor Trig","Pi GPIO 23 (pin 16)"),("Sensor Echo","Converter HV1"),("Converter LV1","Pi GPIO 24 (pin 18)"),("Converter HV","Pi 5 V (pin 4)"),("Converter LV","Pi 3.3 V (pin 1)"),("Converter GND","Pi GND (pin 14)")]
+pins=[("Sensor VCC","Pi 5 V (pin 2)"),("Sensor GND","Pi GND (pin 6)"),("Sensor Trig","Pi GPIO 23 (pin 16)"),("Sensor Echo","Converter RXI (5 V side)"),("Converter RXO (3.3 V)","Pi pin 18"),("Converter HV","Pi 5 V (pin 4)"),("Converter LV","Pi 3.3 V (pin 1)"),("Converter GND","Pi GND (pin 14)")]
 b+='<text x="28" y="392" font-size="14" font-weight="700" fill="#111827">8 female-to-female jumpers: every end pushes onto a pin (Pi, sensor and converter all have pins), no crimps</text>'
 for i,(f,t) in enumerate(pins):
     x=28+(i%4)*285; y=416+(i//4)*22
@@ -74,7 +74,7 @@ page("Set 1 · Lion roar: wiring (ultrasonic sensor + speaker)",
      "Raspberry Pi 4 · Jaycar XC4442 ultrasonic · XC4486 level converter · speaker on site · no network needed · config-1-lion.json",
      b,["The sensor runs on 5 V and its Echo pin sends back 5 V. Pi pins only take 3.3 V, so Echo must go through the converter (or a 1k/2k resistor divider).",
         "Trig can go straight to the Pi: 3.3 V from the Pi is enough to fire the sensor.",
-        "Person within 1 m → the speaker roars once; again only after they step away and 10 s have passed.",
+        "Person within 1.5 m → one roar. If they stay, another roar 5 s after the last one ends; someone new gets one straight away.",
         "Male-to-female jumpers are only for the backup plan: a 1k/2k resistor divider on a mini breadboard instead of the converter."],"set1-lion-wiring.svg",H=590)
 
 def button_set(n,name,sub,notes,fname,udp):
@@ -85,22 +85,22 @@ def button_set(n,name,sub,notes,fname,udp):
     b+=wire([(768,170),(888,170)],C["dc5"])
     b+='<text x="828" y="188" font-size="11" font-weight="600" fill="#111827" text-anchor="middle">GND · pin 9</text>'
     b+='<text x="828" y="202" font-size="11" font-weight="600" fill="#d97706" text-anchor="middle">LED · pin 4 + pin 6</text>'
-    b+=box(888,240,270,72,"Venue network switch",["light/sound system listens for","UDP: "+udp],None,"SITE")
+    b+=box(888,240,270,72,"Venue network switch",["grandMA2 lighting desk "+udp,"telnet port 30000"],None,"SITE")
     b+=wire([(700,230),(700,276),(888,276)],C["net"],"ethernet cable",790,268)
     b+=box(528,276,150,64,"(no speaker)",["aux jack unused","unless a sound is added"],None,"SITE")
     page(name,sub,b,notes,fname,H=510)
 
 button_set(2,"Set 2 · Button: wiring (spaceship jet lights)",
      "Raspberry Pi 4 · lit arcade button · ethernet to the venue · no sound · settings file config-2-button.json",
-     ["Press → the Pi sends one UDP message to the venue system, which changes the lights on the spaceship jet.",
+     ["Press → the Pi logs in to the grandMA2 desk over telnet and sends Toggle Exec 130, which switches the spaceship jet lights.",
       "Button wiring: 2 female-to-female jumpers. Pi end: push onto pin 11 (GPIO 17) and pin 9 (GND). Button end: cut off the plug, strip 5 mm,",
       "  fold the bare wire double, crimp a 6.3 mm female spade, push onto the microswitch's COM and NO tabs (not NC, not the 2 LED tabs). No resistor.",
       "Light: 2 more crimped jumpers from the LED tabs to pin 4 (5 V) and pin 6 (GND). Dark? swap them (LED has a + side). Too dim on 5 V?",
       "  Use a 12 V DC plug pack + DC-socket-to-screw-terminal adapter on the LED tabs instead (Pi pins stay as they are).",
-      "UDP message, IP and port are placeholders until the venue tells us what its system listens for."],"set2-button-wiring.svg","SPACESHIP_JET_GO (placeholder)")
+      "Desk IP, user, password and command are set with ./set-ma.sh (the password is never stored in git)."],"set2-button-wiring.svg","192.168.0.20")
 button_set(3,"Set 3 · Spare: wiring (set up as a button)",
      "Identical to set 2, ready to swap in or to become a third trigger · settings file config-3-spare.json",
      ["Wired exactly like set 2: 2 female-to-female jumpers onto pins 11 and 9, button end cut and crimped with 6.3 mm female spades.",
       "To swap in: for the button set copy config-2-button.json in as config.json; for the lion move the sensor, converter and jumpers across.",
       "Light: same as set 2, LED tabs to pin 4 (5 V) and pin 6 (GND), or a 12 V plug pack if 5 V is too dim.",
-      "If a third trigger is wanted later, only its settings file changes (sound, UDP message or both)."],"set3-spare-wiring.svg","SPARE_BUTTON_GO (placeholder)")
+      "If a third trigger is wanted later, only its settings file changes (default: Toggle Exec 131 on the desk)."],"set3-spare-wiring.svg","192.168.0.20")

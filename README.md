@@ -1,58 +1,104 @@
 # Balloon Story · Pi Activation Stations
 
-Small Raspberry Pi "activation stations" for the Balloon Story statues. Each station waits for a visitor to do something (press a button or walk up to a statue) and then:
+Small Raspberry Pi "activation stations" for the Balloon Story statues. Each station waits for a visitor to do something (walk up to a statue or press a button) and then:
 
 - **plays an mp3** through a speaker, and/or
-- **sends a UDP message** to the venue's light/sound system (e.g. to change the lights on the spaceship jet).
+- **sends a command to the venue's grandMA2 lighting desk** (e.g. to switch the lights on the spaceship jet).
 
-One Python script (`station.py`) runs on every Pi. What each station does is set entirely by its JSON settings file, so the same code covers all three sets.
+One Python script (`station.py`) runs on every Pi. What each station does is set entirely by its JSON settings file, so the same code covers every set.
 
-| Set | Trigger | Action | Settings file |
-|-----|---------|--------|---------------|
-| 1 · Lion roar | Ultrasonic sensor: someone within 1 m | Plays `lion_roar.mp3` through a speaker | [`config-1-lion.json`](config-1-lion.json) |
-| 2 · Spaceship jet | Lit arcade button | Sends UDP `SPACESHIP_JET_GO` to the venue | [`config-2-button.json`](config-2-button.json) |
-| 3 · Spare | Lit arcade button | Sends UDP `SPARE_BUTTON_GO` (ready to swap in for set 1 or 2) | [`config-3-spare.json`](config-3-spare.json) |
-
-> The UDP message, IP and port in sets 2 and 3 are **placeholders** until the venue tells us what its system listens for.
+| Set | Pi | Trigger | Action | Settings file |
+|-----|----|---------|--------|---------------|
+| 1 · Lion roar | `bs-rpi2` | Ultrasonic sensor: someone within 1.5 m | Plays `lion_roar.mp3` through a speaker | [`config-1-lion.json`](config-1-lion.json) |
+| 2 · Spaceship jet | `bs-rpi1` | Lit arcade button | Sends `Toggle Exec 130` to the grandMA2 desk | [`config-2-button.json`](config-2-button.json) |
+| 3 · Spare | – | Lit arcade button | Sends `Toggle Exec 131` (ready to swap in for set 1 or 2) | [`config-3-spare.json`](config-3-spare.json) |
 
 ---
 
-## Wiring
+## Set 1 · Lion roar
 
-### Set 1 · Lion roar (ultrasonic sensor + speaker)
+### How it works
 
-![Set 1 lion wiring](wiring/set1-lion-wiring.png)
+![How the lion works](wiring/how-lion.png)
 
-The ultrasonic sensor runs on 5 V and its Echo pin sends back 5 V, but Pi pins only take 3.3 V. That's why Echo goes through the logic level converter (a 1k/2k resistor divider also works). Trig can go straight to the Pi.
+The sensor in the lion base measures the distance to whatever is in front of it 20 times a second. When someone comes within 1.5 m, the Pi plays `lion_roar.mp3` (10 s) from its 3.5 mm jack to the speaker.
+
+- **New visitor → roar straight away.** Someone counts as new once nobody has been inside 1.5 m for 0.5 s (`clear_s`), so a single missed sensor reading doesn't count as leaving.
+- **Visitor stays → roar again** 5 s (`repeat_s`) after the last roar finishes, for as long as they stay.
+- **Never two at once:** no new roar while one is playing, and at least 5 s (`cooldown_s`) between the starts of two roars.
+
+The timeline in the picture comes from running `station.py`'s own rules on a made-up visit (see `wiring/how.py`).
+
+### Wiring, pin by pin
+
+![Lion pin-by-pin wiring](wiring/set1-lion-pins.png)
+
+The ultrasonic sensor runs on 5 V and its Echo pin sends back 5 V, but Pi pins only take 3.3 V. That's why Echo goes through the logic level converter's RXI → RXO channel (a 1k/2k resistor divider also works). Trig can go straight to the Pi.
 
 | # | From | To |
 |---|------|----|
-| 1 | Sensor VCC | Pi 5 V (pin 2) |
-| 2 | Sensor GND | Pi GND (pin 6) |
-| 3 | Sensor Trig | Pi GPIO 23 (pin 16) |
-| 4 | Sensor Echo | Converter HV1 |
-| 5 | Converter LV1 | Pi GPIO 24 (pin 18) |
-| 6 | Converter HV | Pi 5 V (pin 4) |
-| 7 | Converter LV | Pi 3.3 V (pin 1) |
-| 8 | Converter GND | Pi GND (pin 14) |
+| 1 | Sensor VCC | Pi pin 2 (5 V) |
+| 2 | Sensor GND | Pi pin 6 (GND) |
+| 3 | Sensor Trig | Pi pin 16 (GPIO 23) |
+| 4 | Sensor Echo | Converter RXI (5 V side, top channel) |
+| 5 | Converter RXO (3.3 V side, top channel) | Pi pin 18 (GPIO 24) |
+| 6 | Converter HV | Pi pin 4 (5 V) |
+| 7 | Converter LV | Pi pin 1 (3.3 V) |
+| 8 | Converter GND (3.3 V side) | Pi pin 14 (GND) |
 
-### Set 2 · Button (spaceship jet lights)
+All 8 are female-to-female jumpers: every end pushes onto a pin, no crimping. Wire it with the Pi unplugged.
 
-![Set 2 button wiring](wiring/set2-button-wiring.png)
+### Whole station
 
-| From | To |
-|------|----|
-| Button microswitch **COM** | Pi GPIO 17 (pin 11) |
-| Button microswitch **NO** | Pi GND (pin 9) |
-| Button LED tab + | Pi 5 V (pin 4) |
-| Button LED tab − | Pi GND (pin 6) |
+![Set 1 lion wiring overview](wiring/set1-lion-wiring.png)
 
-- Use the **COM** and **NO** tabs, not NC. No resistor needed (the Pi's internal pull-up is used).
-- Button end: cut the jumper plug off, strip 5 mm, fold the wire double and crimp a 6.3 mm female spade.
-- LED stays dark? Swap its two wires. Too dim on 5 V? Power the LED tabs from a 12 V DC plug pack instead.
-- Ethernet cable from the Pi to the venue network switch.
+---
 
-### Set 3 · Spare (set up as a button)
+## Set 2 · Spaceship jet button
+
+### How it works
+
+![How the spaceship jet button works](wiring/how-jet.png)
+
+A press joins GPIO 17 to GND. The Pi opens a telnet connection to the grandMA2 desk (`192.168.0.20`, port `30000`), logs in, sends one command line (`Toggle Exec 130`) and hangs up, the same way as the venue's existing MA button. The desk flips Executor 130, so presses alternate the jet lights on and off.
+
+- **One press = one command.** Holding the button down doesn't repeat it.
+- **Cooldown:** presses within 5 s (`cooldown_s`) of the last command are ignored.
+- **Desk unreachable?** The Pi logs `MA2 command failed` and keeps waiting for the next press.
+
+### Wiring, pin by pin
+
+![Spaceship jet pin-by-pin wiring](wiring/set2-jet-pins.png)
+
+| # | From | To |
+|---|------|----|
+| 1 | Button microswitch **COM** | Pi pin 11 (GPIO 17) |
+| 2 | Button microswitch **NO** | Pi pin 9 (GND) |
+| 3 | Button LED + | Pi pin 4 (5 V) |
+| 4 | Button LED − | Pi pin 6 (GND) |
+
+- Use the **COM** and **NO** tabs, never NC. No resistor is needed: the Pi's internal pull-up is used.
+- Button end of each jumper: cut the plug off, strip 5 mm, fold the bare wire double, crimp a 6.3 mm female spade and push it onto the tab.
+- LED stays dark? Swap wires 3 and 4. Too dim on 5 V? Power the LED tabs from a 12 V DC plug pack instead.
+- Ethernet cable from the Pi to the venue network switch (same network as the desk).
+
+### Whole station
+
+![Set 2 button wiring overview](wiring/set2-button-wiring.png)
+
+### Setting the desk login
+
+The password is **not** stored in git (`config-2-button.json` has `CHANGE_ME`). Set the desk details on the Pi from the Mac:
+
+```bash
+./set-ma.sh bs-rpi1 192.168.0.20 administrator '<password>' "Toggle Exec 130"
+```
+
+This updates `~/station/config.json` on the Pi and restarts the station.
+
+---
+
+## Set 3 · Spare
 
 ![Set 3 spare wiring](wiring/set3-spare-wiring.png)
 
@@ -72,6 +118,7 @@ Wired exactly like set 2. To swap it in for the button set, copy `config-2-butto
 | Lit arcade button, red, 25 mm | SP0662 | sets 2, 3 |
 | Female-to-female jumper wires | – | all |
 | 6.3 mm female spade crimps | – | sets 2, 3 |
+| Stick-on heatsinks (see [where they go](wiring/pi4-heatsinks.png)) | – | all |
 | Speaker + 3.5 mm aux cable | on site | set 1 |
 | Ethernet cable | on site | sets 2, 3 |
 
@@ -83,7 +130,7 @@ Wired exactly like set 2. To swap it in for the button set, copy `config-2-butto
 
 In **Raspberry Pi Imager**, flash Raspberry Pi OS (Lite is fine) and in the settings:
 
-- hostname: `bs-lion`, `bs-button` or `bs-spare`
+- hostname: `bs-rpi2` for the lion, `bs-rpi1` for the jet button (any name works)
 - username: `pi`
 - enable SSH and add your Mac's public SSH key
 - set up Wi-Fi if the Pi won't be on ethernet during setup
@@ -93,11 +140,12 @@ In **Raspberry Pi Imager**, flash Raspberry Pi OS (Lite is fine) and in the sett
 With the Pi powered on and on the same network as the Mac:
 
 ```bash
-./setup-pi.sh lion      # or: button, spare
-./setup-pi.sh button my-pi-name   # optional custom hostname (default is bs-<set>)
+./setup-pi.sh lion bs-rpi2      # set type, then the Pi's hostname
+./setup-pi.sh button bs-rpi1
+./set-ma.sh bs-rpi1 192.168.0.20 administrator '<password>' "Toggle Exec 130"   # button only
 ```
 
-The script:
+The setup script:
 
 1. copies `station.py`, `station.service` and the set's settings file (as `config.json`) to `~/station/` on the Pi, plus the mp3 for the lion
 2. installs `mpg123`, `gpiozero`, `lgpio` and ALSA tools
@@ -107,10 +155,10 @@ The script:
 ### 3. Check it's working
 
 ```bash
-ssh pi@bs-lion.local journalctl -u station -f
+ssh pi@bs-rpi2.local journalctl -u station -f
 ```
 
-You should see `Triggered` each time the button is pressed or someone walks up.
+You should see `Triggered` each time someone walks up or the button is pressed, and `MA2 command sent: Toggle Exec 130` on the button Pi. To see the lion sensor's live distance readings, add `"debug": true` to its `config.json` and restart.
 
 ---
 
@@ -122,14 +170,20 @@ You should see `Triggered` each time the button is pressed or someone walks up.
 | `button_gpio` | GPIO number the button is on (BCM numbering) |
 | `trigger_gpio`, `echo_gpio` | GPIO numbers for the ultrasonic sensor's Trig and Echo |
 | `distance_mm` | Fire when someone is closer than this (sensor only) |
-| `cooldown_s` | Minimum seconds between two triggers |
+| `max_distance_m` | Furthest distance the sensor reports (sensor only) |
+| `cooldown_s` | Minimum seconds between the starts of two triggers |
+| `clear_s` | Seconds with nobody there (or the button released) before the next visitor counts as new |
+| `repeat_s` | Someone who stays gets another trigger this many seconds after the sound ends; `0` or missing = never |
 | `play_sound` | `true` to play `mp3_file` |
 | `mp3_file` | Full path of the mp3 on the Pi |
 | `audio_device` | ALSA device; `plughw:CARD=Headphones,DEV=0` is the 3.5 mm jack |
-| `send_udp` | `true` to send `udp_message` |
-| `udp_ip`, `udp_port`, `udp_message` | Where and what to send to the venue system |
-
-A station fires only on a **new** press or a **new** person: someone standing in front of the lion triggers one roar, and it can roar again only after they step away and the cooldown has passed.
+| `send_ma` | `true` to send `ma_command` to the grandMA2 desk |
+| `ma_ip`, `ma_port` | Desk address; telnet is port `30000` |
+| `ma_user`, `ma_pass` | Desk login (set with `set-ma.sh`, not in git) |
+| `ma_command` | One grandMA2 command line, e.g. `Toggle Exec 130` |
+| `send_udp` | `true` to send `udp_message` (not used at the moment) |
+| `udp_ip`, `udp_port`, `udp_message` | Where and what to send over UDP |
+| `debug` | `true` to log the sensor distance twice a second |
 
 To change settings on a running Pi, edit `~/station/config.json` and run `sudo systemctl restart station` (or edit the file here and re-run `setup-pi.sh`).
 
@@ -141,17 +195,22 @@ To change settings on a running Pi, edit `~/station/config.json` and run `sudo s
 station.py            the program that runs on every Pi
 station.service       systemd unit: starts station.py on boot, restarts on crash
 setup-pi.sh           one-command setup of a Pi over SSH from a Mac
+set-ma.sh             sets the grandMA2 desk IP, login and command on a button Pi
 config-1-lion.json    settings for set 1 (lion roar)
 config-2-button.json  settings for set 2 (spaceship jet button)
 config-3-spare.json   settings for set 3 (spare button)
 lion_roar.mp3         sound played by the lion
-wiring/               wiring diagrams (PNG + SVG) and gen.py, which draws them
+wiring/               diagrams (PNG + SVG) and the scripts that draw them:
+  gen.py                whole-station overviews (set1/2/3-*-wiring)
+  lionpins.py           lion pin-by-pin sheet
+  jetpins.py            spaceship jet pin-by-pin sheet
+  how.py                "how it works" sheets for the lion and the jet
+  heatsinks.py          where the Pi 4 heatsinks go
+  render.sh             runs all of the above and exports the PNGs
 ```
 
-To redraw the wiring diagrams after editing `wiring/gen.py`:
+To redraw the diagrams after editing a script (needs Google Chrome for the PNG export):
 
 ```bash
-cd wiring && python3 gen.py   # writes the .svg files
+cd wiring && ./render.sh
 ```
-
-The PNGs are exports of those SVGs.
